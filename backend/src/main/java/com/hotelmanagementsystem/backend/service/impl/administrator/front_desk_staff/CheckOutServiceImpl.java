@@ -35,7 +35,7 @@ public class CheckOutServiceImpl implements CheckOutService {
         LiveOrderRecord liveOrderRecord = liveOrderRecordMapper.selectOne(queryWrapper);
         // 更新liveOrderRecord
         UpdateWrapper<LiveOrderRecord> updateWrapper = new UpdateWrapper<>();
-        updateWrapper.eq("number", number).eq("status", "已入住").set("status", "已完成").set("checkout_date", Date.valueOf(LocalDate.now()));
+        updateWrapper.eq("number", number).set("status", "已完成").set("checkout_date", Date.valueOf(LocalDate.now()));
         liveOrderRecordMapper.update(null, updateWrapper);
         // 以liveOrderRecord住宿订单记录为参考生成一条常规财务记录存入常规财务表中
         GeneralFinanceRecord generalFinanceRecord = new GeneralFinanceRecord(liveOrderRecord.getNumber(), "住宿订单", liveOrderRecord.getPrice(), liveOrderRecord.getFinishTime());
