@@ -18,6 +18,9 @@ public class QueryRoomInfoValidCheck {
         }
         LocalDate checkin_date = LocalDate.parse(checkinTime);
         LocalDate latest_leave_date = LocalDate.parse(latestLeaveTime);
+        if(checkin_date.isBefore(LocalDate.now())){
+            return "入住日期不可早于今天！";
+        }
         if (checkin_date.isAfter(latest_leave_date)) {
             return "预计离开日期要晚于入住日期！";
         }
