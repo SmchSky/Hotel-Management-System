@@ -1,84 +1,85 @@
 package com.hotelmanagementsystem.backend.service.impl.administrator.superuser;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.hotelmanagementsystem.backend.mapper.*;
 import com.hotelmanagementsystem.backend.pojo.*;
 import com.hotelmanagementsystem.backend.service.inter.administrator.superuser.RemoveStaffUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Stack;
 
 @Service
 public class RemoveStaffUserServiceImpl implements RemoveStaffUserService {
+    
+    private final FinancialStaffMapper financialStaffMapper;
+    private final FrontDeskStaffMapper frontDeskStaffMapper;
+    private final HrStaffMapper hrStaffMapper;
+    private final PurchaseStaffMapper purchaseStaffMapper;
+    private final RestaurantStaffMapper restaurantStaffMapper;
+    private final StaffMapper staffMapper;
+    
     @Autowired
-    private FinancialStaffMapper financialStaffMapper;
-    @Autowired
-    private FrontDeskStaffMapper frontDeskStaffMapper;
-    @Autowired
-    private HrStaffMapper hrStaffMapper;
-    @Autowired
-    private PurchaseStaffMapper purchaseStaffMapper;
-    @Autowired
-    private RestaurantStaffMapper restaurantStaffMapper;
-    @Autowired
-    private StaffMapper staffMapper;
-
+    public RemoveStaffUserServiceImpl(FinancialStaffMapper financialStaffMapper, FrontDeskStaffMapper frontDeskStaffMapper, HrStaffMapper hrStaffMapper, PurchaseStaffMapper purchaseStaffMapper, RestaurantStaffMapper restaurantStaffMapper, StaffMapper staffMapper) {
+        this.financialStaffMapper = financialStaffMapper;
+        this.frontDeskStaffMapper = frontDeskStaffMapper;
+        this.hrStaffMapper = hrStaffMapper;
+        this.purchaseStaffMapper = purchaseStaffMapper;
+        this.restaurantStaffMapper = restaurantStaffMapper;
+        this.staffMapper = staffMapper;
+    }
+    
+    /**
+     * 有时间可以看一下是不是先删员工信息表再删员工用户表更方便！！！
+     */
     @Override
     public Map<String, String> removeStaffUser(Map<String, String> data) {
-        //用于返回的map
         Map<String, String> map = new HashMap<>();
-
         String username = data.get("username");
         String duty = data.get("duty");
-        String number = null;
-
-        //从相应员工用户表中删除user
-        if ("酒店前台工作人员".equals(duty)) {
-            QueryWrapper<FrontDeskStaff> frontDeskStaffQueryWrapper = new QueryWrapper<>();
-            frontDeskStaffQueryWrapper.eq("username", username);
-            //取出员工编号
-            number = frontDeskStaffMapper.selectOne(frontDeskStaffQueryWrapper).getNumber();
-            //删除
-            frontDeskStaffMapper.delete(frontDeskStaffQueryWrapper);
-        } else if ("餐厅前台工作人员".equals(duty)) {
-            QueryWrapper<RestaurantStaff> restaurantStaffQueryWrapper = new QueryWrapper<>();
-            restaurantStaffQueryWrapper.eq("username", username);
-            //取出员工编号
-            number = restaurantStaffMapper.selectOne(restaurantStaffQueryWrapper).getNumber();
-            //删除
-            restaurantStaffMapper.delete(restaurantStaffQueryWrapper);
-        } else if ("财务管理员".equals(duty)) {
-            QueryWrapper<FinancialStaff> financialStaffQueryWrapper = new QueryWrapper<>();
-            financialStaffQueryWrapper.eq("username", username);
-            //取出员工编号
-            number = financialStaffMapper.selectOne(financialStaffQueryWrapper).getNumber();
-            //删除
-            financialStaffMapper.delete(financialStaffQueryWrapper);
-        } else if ("人事管理员".equals(duty)) {
-            QueryWrapper<HrStaff> hrStaffQueryWrapper = new QueryWrapper<>();
-            hrStaffQueryWrapper.eq("username", username);
-            //取出员工编号
-            number = hrStaffMapper.selectOne(hrStaffQueryWrapper).getNumber();
-            //删除
-            hrStaffMapper.delete(hrStaffQueryWrapper);
-        } else if ("采购人员".equals(duty)) {
-            QueryWrapper<PurchaseStaff> purchaseStaffQueryWrapper = new QueryWrapper<>();
-            purchaseStaffQueryWrapper.eq("username", username);
-            //取出员工编号
-            number = purchaseStaffMapper.selectOne(purchaseStaffQueryWrapper).getNumber();
-            //删除
-            purchaseStaffMapper.delete(purchaseStaffQueryWrapper);
+        
+        // 删除员工用户并获取员工编号
+        String number = removeStaffUserByDuty(duty, username);
+        if (number == null) {
+            map.put("message", "该用户不存在！");
+            return map;
         }
-
-        //从员工表中删除对应的员工信息
-        QueryWrapper<Staff> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("number", number);
-        staffMapper.delete(queryWrapper);
-
-        map.put("error_message", "success");
+        // 从员工表中删除对应的员工信息
+        staffMapper.delete(new QueryWrapper<Staff>().eq("number", number));
+        map.put("message", "success");
         return map;
+    }
+    
+    private String removeStaffUserByDuty(String duty, String username) {
+        return switch (duty) {
+            case "酒店前台工作人员" ->
+                    removeUser(frontDeskStaffMapper, new QueryWrapper<FrontDeskStaffUser>().eq("username", username));
+            case "餐厅前台工作人员" ->
+                    removeUser(restaurantStaffMapper, new QueryWrapper<RestaurantStaffUser>().eq("username", username));
+            case "财务管理员" ->
+                    removeUser(financialStaffMapper, new QueryWrapper<FinancialStaffUser>().eq("username", username));
+            case "人事管理员" -> removeUser(hrStaffMapper, new QueryWrapper<HrStaffUser>().eq("username", username));
+            case "采购人员" ->
+                    removeUser(purchaseStaffMapper, new QueryWrapper<PurchaseStaffUser>().eq("username", username));
+            default -> null;
+        };
+    }
+    
+    private <T extends User> String removeUser(BaseMapper<T> mapper, QueryWrapper<T> queryWrapper) {
+        User user = mapper.selectOne(queryWrapper);
+        if (user != null) {
+            try {
+                Method method_getNumber = user.getClass().getMethod("getNumber");
+                String number = (String) method_getNumber.invoke(user);
+                mapper.delete(queryWrapper);
+                return number;
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
     }
 }

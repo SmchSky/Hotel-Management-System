@@ -1,11 +1,12 @@
 package com.hotelmanagementsystem.backend.utils;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtBuilder;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
@@ -13,67 +14,101 @@ import java.util.Date;
 import java.util.UUID;
 
 @Component
+@PropertySource({"classpath:jwtConfig.properties"})
 public class JwtUtil {
-    public static final long JWT_TTL = 60 * 60 * 1000L * 24 * 14;  // 有效期14天
-    public static final String JWT_KEY = "SDFGjhdsfalshdfHFdsjkdsfds121232131afasdfac";
-
-    public static String getUUID() {
+    /**
+     * token有效期(14天)（实例变量），不将jwtTtl和jwtMaterialString设置为静态变量的原因是：@Value注解无法对静态变量赋值！！！
+     */
+    @Value("${jwt.ttl}")
+    private long jwtTtl;
+    /**
+     * 密钥生成材料（实例变量）
+     */
+    @Value("${jwt.keyMaterialString}")
+    private String jwtMaterialString;
+    
+    /**
+     * token有效期（静态变量）
+     */
+    private static long JWT_TTL;
+    
+    /**
+     * 密钥（静态变量）
+     */
+    private static SecretKey secretKey;
+    
+    /**
+     * 初始化2个静态变量，包括生成秘钥的过程。@PostConstruct注解用在init方法上，表示init方法会在Spring初始化此Bean并完成依赖注入后执行，用于完成一些初始化操作（比如）
+     * 此方法中：将实例变量的值赋给静态变量，本类静态方法只需要使用token有效期和秘钥，故只设置两个静态变量即可！
+     */
+    @PostConstruct
+    public void init() {
+        JWT_TTL = this.jwtTtl;
+        // 将JWT_STRING（一个随便指定的字符串）进行Base64解码，生成一组随机的二进制数据，这组数据就是生成最终秘钥的秘钥材料
+        byte[] keyMaterial = Base64.getDecoder().decode(this.jwtMaterialString);
+        // 使用秘钥材料和HmacSHA256算法生成一个SecretKey对象（包含了秘钥）
+        secretKey = new SecretKeySpec(keyMaterial, 0, keyMaterial.length, "HmacSHA256");
+    }
+    
+    
+    /**
+     * 生成一个随机的UUID字符串
+     */
+    private static String getUUID() {
         return UUID.randomUUID().toString().replaceAll("-", "");
     }
-
-    //用于OnlineUser
-    public static String createJWT(String subject) {
-        JwtBuilder builder = getJwtBuilder(subject, null, getUUID());
-        return builder.compact();
+    
+    /**
+     * 为线上用户创建JWT
+     *
+     * @param username 用户名
+     * @return JWT
+     */
+    public static String createJwtTokenForOnlineUser(String username) {
+        return createJwtToken(username, getUUID(), null);
     }
-
-    //用于StaffUser
-    public static String createJWT(String subject, String duty) {
-        JwtBuilder builder = getJwtBuilder(subject, duty, null, getUUID());
-        return builder.compact();
+    
+    /**
+     * 为酒店工作人员用户创建JWT
+     *
+     * @param username 用户名
+     * @param duty     职务
+     * @return JWT
+     */
+    public static String createJwtTokenForStaffUser(String username, String duty) {
+        return createJwtToken(username, getUUID(), duty);
     }
-
-    //用于OnlineUser
-    private static JwtBuilder getJwtBuilder(String subject, Long ttlMillis, String uuid) {
+    
+    /**
+     * 创建JWT
+     *
+     * @param subject 用户名
+     * @param uuid    UUID
+     * @param duty    职务
+     * @return JWT
+     */
+    private static String createJwtToken(String subject, String uuid, @Nullable String duty) {
+        // 加密算法为HS256，也就是HmacSHA256，一种对称加密算法
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
-        SecretKey secretKey = generalKey();
+        // 计算token的过期时间
         long nowMillis = System.currentTimeMillis();
         Date now = new Date(nowMillis);
-        if (ttlMillis == null) {
-            ttlMillis = JwtUtil.JWT_TTL;
+        long expMillis = nowMillis + JwtUtil.JWT_TTL;
+        Date expire = new Date(expMillis);
+        // 创建JwtBuilder
+        JwtBuilder builder = Jwts.builder().setId(uuid).setSubject(subject).setIssuer("smy").setIssuedAt(now).signWith(secretKey, signatureAlgorithm).setExpiration(expire);
+        if (duty != null) {
+            builder.claim("duty", duty);
         }
-
-        long expMillis = nowMillis + ttlMillis;
-        Date expDate = new Date(expMillis);
-        return Jwts.builder().setId(uuid).setSubject(subject).setIssuer("sg").setIssuedAt(now).signWith(signatureAlgorithm, secretKey).setExpiration(expDate);
+        return builder.compact();
     }
-
-    //用于StaffUser，利用username和duty生成JWT
-    private static JwtBuilder getJwtBuilder(String subject, String duty, Long ttlMillis, String uuid) {
-        SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
-        SecretKey secretKey = generalKey();
-        long nowMillis = System.currentTimeMillis();
-        Date now = new Date(nowMillis);
-        if (ttlMillis == null) {
-            ttlMillis = JwtUtil.JWT_TTL;
-        }
-
-        long expMillis = nowMillis + ttlMillis;
-        Date expDate = new Date(expMillis);
-
-        Claims claims = Jwts.claims().setSubject(subject);
-        claims.put("duty", duty);
-
-        return Jwts.builder().setId(uuid).setIssuer("sg").setIssuedAt(now).signWith(signatureAlgorithm, secretKey).setExpiration(expDate).setClaims(claims);
-    }
-
-    public static SecretKey generalKey() {
-        byte[] encodeKey = Base64.getDecoder().decode(JwtUtil.JWT_KEY);
-        return new SecretKeySpec(encodeKey, 0, encodeKey.length, "HmacSHA256");
-    }
-
-    public static Claims parseJWT(String jwt) throws Exception {  //验证JWT是否有效
-        SecretKey secretKey = generalKey();
-        return Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(jwt).getBody();
+    
+    /**
+     * 验证token是否有效（包括是否过期）
+     *
+     * @param token token
+     */
+    public static Claims parseJWT(String token) throws JwtException {
+        return Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token).getBody();
     }
 }

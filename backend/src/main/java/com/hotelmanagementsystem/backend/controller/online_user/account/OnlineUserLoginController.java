@@ -7,15 +7,20 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/hotel")
 public class OnlineUserLoginController {
-    @Autowired
-    private OnlineUserLoginService loginService;
+    
+    private final OnlineUserLoginService loginService;
 
-    @PostMapping("/online_user/account/login/")
-    public Map<String, String> getToken(@RequestParam Map<String, String> data) {
+    @Autowired
+    public OnlineUserLoginController(OnlineUserLoginService loginService) {
+        this.loginService = loginService;
+    }
+    
+    @PostMapping("/online_user/login")
+    public Map<String, String> login(@RequestParam Map<String, String> data) {
         String username = data.get("username");
         String password = data.get("password");
-        return loginService.getToken(username, password);
+        return loginService.login(username, password);
     }
-
 }

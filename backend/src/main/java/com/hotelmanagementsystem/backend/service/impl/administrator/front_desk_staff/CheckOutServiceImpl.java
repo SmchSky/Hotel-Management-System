@@ -10,38 +10,37 @@ import com.hotelmanagementsystem.backend.service.inter.administrator.front_desk_
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.sql.Date;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
 @Service
 public class CheckOutServiceImpl implements CheckOutService {
+    
+    private final LiveOrderRecordMapper liveOrderRecordMapper;
+    private final GeneralFinanceRecordMapper generalFinanceRecordMapper;
+    
     @Autowired
-    private LiveOrderRecordMapper liveOrderRecordMapper;
-    @Autowired
-    private GeneralFinanceRecordMapper generalFinanceRecordMapper;
+    public CheckOutServiceImpl(LiveOrderRecordMapper liveOrderRecordMapper, GeneralFinanceRecordMapper generalFinanceRecordMapper) {
+        this.liveOrderRecordMapper = liveOrderRecordMapper;
+        this.generalFinanceRecordMapper = generalFinanceRecordMapper;
+    }
     
     @Override
     public Map<String, String> checkOut(Map<String, String> data) {
-        // 返回的map
         Map<String, String> map = new HashMap<>();
-        // 取出入住记录的订单编号
         String number = data.get("number");
-        System.out.println(number);
-        // 在表中检索liveOrderRecord
-        QueryWrapper<LiveOrderRecord> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("number", number);
-        LiveOrderRecord liveOrderRecord = liveOrderRecordMapper.selectOne(queryWrapper);
-        // 更新liveOrderRecord
+        // 更新liveOrderRecord状态为"已完成"
         UpdateWrapper<LiveOrderRecord> updateWrapper = new UpdateWrapper<>();
-        updateWrapper.eq("number", number).set("status", "已完成").set("checkout_date", Date.valueOf(LocalDate.now()));
+        updateWrapper.eq("number", number).set("status", "已完成").set("checkout_date", LocalDate.now());
         liveOrderRecordMapper.update(null, updateWrapper);
+        // 查询出刚更新的住宿订单记录
+        QueryWrapper<LiveOrderRecord> queryWrapper = new QueryWrapper<>();
+        LiveOrderRecord liveOrderRecord = liveOrderRecordMapper.selectOne(queryWrapper.eq("number", number));
         // 以liveOrderRecord住宿订单记录为参考生成一条常规财务记录存入常规财务表中
         GeneralFinanceRecord generalFinanceRecord = new GeneralFinanceRecord(liveOrderRecord.getNumber(), "住宿订单", liveOrderRecord.getPrice(), liveOrderRecord.getFinishTime());
         generalFinanceRecordMapper.insert(generalFinanceRecord);
-        // 返回的map
-        map.put("error_message", "success");
+        map.put("message", "success");
         return map;
     }
 }

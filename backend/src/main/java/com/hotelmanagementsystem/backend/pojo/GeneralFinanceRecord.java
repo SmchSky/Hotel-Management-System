@@ -1,12 +1,11 @@
 package com.hotelmanagementsystem.backend.pojo;
 
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
@@ -16,6 +15,5 @@ public class GeneralFinanceRecord {
     private String number;
     private String type;  //包含“餐饮订单”、“住宿订单”
     private Integer price;
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
-    private Date finishTime;
+    private LocalDateTime finishTime;
 }

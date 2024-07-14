@@ -11,17 +11,18 @@ import java.util.List;
 
 @Service
 public class GetMenuServiceImpl implements GetMenuListService {
-    @Autowired
-    private DishMapper dishMapper;
+    
+    private final DishMapper dishMapper;
 
+    @Autowired
+    public GetMenuServiceImpl(DishMapper dishMapper) {
+        this.dishMapper = dishMapper;
+    }
+    
     @Override
     public List<Dish> getMenu() {
-
-        //获得有库存的菜品
         QueryWrapper<Dish> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("status", "有库存");
-        //定义返回的list
-        List<Dish> list = dishMapper.selectList(queryWrapper);
-        return list;
+        return dishMapper.selectList(queryWrapper.eq("status", "有库存"));
+        
     }
 }

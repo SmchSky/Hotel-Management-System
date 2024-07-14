@@ -40,21 +40,20 @@ export default {
             // 在此处执行页面跳转逻辑
             router.push({ name: "register" });
         };
+
         const store = useStore();
-        let username = ref('');  //与上面的username对应
+        let username = ref('');
         let password = ref('');
         let error_message = ref('');
 
-        //查看本地存储中是否存在jwt_token，不存在则jwt_token被赋值为null
-        const jwt_token = localStorage.getItem("jwt_token");
-        //本地存储中存在jwt_token
-        if (jwt_token) {
-            //更新token
-            store.commit("online_user/updateToken", jwt_token);
-
-            //验证token是否过期
+        // 查看本地存储中是否存在jwt，不存在则jwt_token被赋值为null
+        const jwt = localStorage.getItem("jwt");
+        if (jwt) {
+            // 更新state中的token
+            store.commit("online_user/updateToken", jwt);
+            // 验证token是否过期
             store.dispatch("online_user/getInfo", {
-                success () {  //未过期
+                success () {  // 未过期
                     router.push({ name: "home" });  //跳转到首页
                 },
                 error () {  //过期
@@ -62,13 +61,13 @@ export default {
             })
         }
 
-        //触发函数
         const login = () => {
             error_message.value = "";  //清空error_message中的信息
             store.dispatch("online_user/login", {
                 username: username.value,
                 password: password.value,
-                success () {  //登录成功
+                // 登录成功的回调函数
+                success () {
                     error_message.value = "登录成功！";
                     store.dispatch("online_user/getInfo", {
                         success () {
@@ -76,16 +75,14 @@ export default {
                                 //登录成功后跳转到的页面名称
                                 router.push({ name: "reserve_room" });
                             }, 1000);
-                        },
-                        error () {
                         }
                     })
                 },
+                // 登录失败的回调函数
                 error () {
                     error_message.value = "用户名或密码错误！";
                 }
-
-            })//调用actions里面的函数
+            })
         }
 
         return {

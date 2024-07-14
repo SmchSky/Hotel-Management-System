@@ -8,75 +8,66 @@ import com.hotelmanagementsystem.backend.pojo.ReservationRecord;
 import com.hotelmanagementsystem.backend.pojo.Room;
 import com.hotelmanagementsystem.backend.service.inter.administrator.front_desk_staff.GetAllRoomListService;
 import com.hotelmanagementsystem.backend.service.inter.administrator.front_desk_staff.GetSelectedRoomListService;
+import com.hotelmanagementsystem.backend.utils.check.info_valid_check.QueryRoomInfoValidCheck;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.sql.Date;
-import java.util.*;
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
-
+/**
+ * 该类的逻辑未修改，留待以后有时间修改
+ */
 @Service
 public class GetSelectedRoomListServiceImpl implements GetSelectedRoomListService {
     
-    @Autowired
-    private LiveOrderRecordMapper liveOrderRecordMapper;
-    @Autowired
-    private ReservationRecordMapper reservationRecordMapper;
+    private final LiveOrderRecordMapper liveOrderRecordMapper;
+    private final ReservationRecordMapper reservationRecordMapper;
+    private final GetAllRoomListService getAllRoomListService;
     
     @Autowired
-    private GetAllRoomListService getAllRoomListService;
+    public GetSelectedRoomListServiceImpl(LiveOrderRecordMapper liveOrderRecordMapper, ReservationRecordMapper reservationRecordMapper, GetAllRoomListService getAllRoomListService) {
+        this.liveOrderRecordMapper = liveOrderRecordMapper;
+        this.reservationRecordMapper = reservationRecordMapper;
+        this.getAllRoomListService = getAllRoomListService;
+    }
     
     @Override
     public Map<String, Object> getRoomList(Map<String, String> data) {
-        // 用于返回的map
         Map<String, Object> map = new HashMap<>();
-        // 从room表中取出所有元组
-        List<Room> list = getAllRoomListService.getRoomList();
-        // 取出信息
-        String checkin_time = data.get("checkin_time");
-        String latest_leave_time = data.get("checkout_time");
+        String checkinTime = data.get("checkin_time");
+        String latestLeaveTime = data.get("checkout_time");
+        LocalDate a = LocalDate.parse(checkinTime);
+        LocalDate b = LocalDate.parse(latestLeaveTime);
         
         // 合法性检验
-        if (checkin_time.length() == 0) {
-            map.put("error_message", "入住日期不可为空！");
-            return map;
-        }
-        if (latest_leave_time.length() == 0) {
-            map.put("error_message", "预计离开日期不可为空！");
-            return map;
-        }
-        // 将checkin_time和latest_leave_time转换为Date类型
-        Date a = Date.valueOf(checkin_time);
-        Date b = Date.valueOf(latest_leave_time);
-        
-        // 判断checkin_date是否在latest_leave_date后面
-        if (a.after(b) || a.equals(b)) {
-            map.put("error_message", "预计离开日期要晚于入住日期！");
+        String message = QueryRoomInfoValidCheck.checkQueryRoomInfoValid(checkinTime, latestLeaveTime);
+        if(!message.equals("success")){
+            map.put("message", message);
             return map;
         }
         
-        
-        // 根据信息检索满足条件的房间列表并返回
-        
+        // 先获取全部的房间列表
+        List<Room> list = getAllRoomListService.getRoomList();
+        // 根据条件查询房间列表
         // 从订单表选择已入住的元组
         QueryWrapper<LiveOrderRecord> queryWrapper1 = new QueryWrapper<>();
         queryWrapper1.eq("status", "已入住");
-        
         // liveOrderRecordList中的元组对应的room是要从list中删除的
         List<LiveOrderRecord> liveOrderRecordList = liveOrderRecordMapper.selectList(queryWrapper1);
         Iterator<LiveOrderRecord> iterator_live_record = liveOrderRecordList.iterator();
-        
-        
         // 将liveOrderRecordList遍历，完成对其的检索
         while (iterator_live_record.hasNext()) {
             // 取出元素
             LiveOrderRecord element = iterator_live_record.next();
             // 定义A和B
-            Date A = element.getCheckinDate();
-            Date B = element.getLatestLeaveDate();
-            if (a.after(B) || A.after(b)) {
+            LocalDate A = element.getCheckinDate();
+            LocalDate B = element.getLatestLeaveDate();
+            if (a.isAfter(B) || A.isAfter(b)) {
                 // 将该订单记录从liveOrderRecordList中移除
-                // 删除选中的元素
                 iterator_live_record.remove();
             }
         }
@@ -107,9 +98,9 @@ public class GetSelectedRoomListServiceImpl implements GetSelectedRoomListServic
         // 将reservationRecordList遍历，完成对其的检索
         while (iterator_reserve_record.hasNext()) {
             ReservationRecord element = iterator_reserve_record.next();
-            Date A = element.getCheckinDate();
-            Date B = element.getLatestLeaveDate();
-            if (a.after(B) || A.after(b)) {
+            LocalDate A = element.getCheckinDate();
+            LocalDate B = element.getLatestLeaveDate();
+            if (a.isAfter(B) || A.isAfter(b)) {
                 // 将该订单记录从reservationRecordList中移除
                 iterator_reserve_record.remove();
             }
@@ -128,7 +119,7 @@ public class GetSelectedRoomListServiceImpl implements GetSelectedRoomListServic
             }
         }
         // 定义返回map
-        map.put("error_message", "success");
+        map.put("message", "success");
         map.put("selected_rooms", list);
         return map;
     }

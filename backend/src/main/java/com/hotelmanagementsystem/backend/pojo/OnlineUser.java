@@ -1,17 +1,12 @@
 package com.hotelmanagementsystem.backend.pojo;
 
-import com.baomidou.mybatisplus.annotation.TableId;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class OnlineUser {
-    @TableId
-    private String username;
-    private String password;
-    private String phone;
-
+@EqualsAndHashCode(callSuper = true)
+public class OnlineUser extends User {
+    public OnlineUser(String username, String password, String phone) {
+        super(username, password, phone);
+    }
 }

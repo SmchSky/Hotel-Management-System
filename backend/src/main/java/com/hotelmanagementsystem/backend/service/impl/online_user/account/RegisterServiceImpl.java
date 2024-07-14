@@ -4,100 +4,81 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.hotelmanagementsystem.backend.mapper.OnlineUserMapper;
 import com.hotelmanagementsystem.backend.pojo.OnlineUser;
 import com.hotelmanagementsystem.backend.service.inter.online_user.account.OnlineUserRegisterService;
+import com.hotelmanagementsystem.backend.utils.check.info_valid_check.UserInfoValidCheck;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
 public class RegisterServiceImpl implements OnlineUserRegisterService {
-
+    
+    private final OnlineUserMapper onlineUserMapper;
+    
+    private final PasswordEncoder passwordEncoder;
+    
     @Autowired
-    private OnlineUserMapper onlineUserMapper;  //因为要访问数据库查询用户名是否有重复
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
+    public RegisterServiceImpl(OnlineUserMapper onlineUserMapper, PasswordEncoder passwordEncoder) {
+        this.onlineUserMapper = onlineUserMapper;
+        this.passwordEncoder = passwordEncoder;
+    }
+    
+    /**
+     * 完成线上用户注册，并将信息存入数据库中
+     *
+     * @param username           用户名
+     * @param password           密码
+     * @param confirmed_password 确认密码
+     * @param phone              手机号
+     * @return 注册结果信息
+     */
     @Override
-    //利用前端用户输入的信息完成注册操作，并在数据库的表中进行元组插入
     public Map<String, String> register(String username, String password, String confirmed_password, String phone) {
         Map<String, String> map = new HashMap<>();
-
-        if (username.length() == 0) {
-            map.put("error_message", "用户名不能为空！");
+        
+        // 参数完整性检查
+        if(username == null || password == null || confirmed_password == null || phone == null){
+            map.put("message", "信息不全！");
             return map;
         }
-
-        if (password.length() == 0) {
-            map.put("error_message", "密码不能为空！");
+        
+        // 信息合法性检验
+        String message = UserInfoValidCheck.checkOnlineUserInfoValid(username, password, confirmed_password, phone);
+        if (!message.equals("success")) {
+            map.put("message", message);
             return map;
         }
-
-        if (confirmed_password.length() == 0) {
-            map.put("error_message", "确认密码不能为空！");
-            return map;
-        }
-
-        if (!password.equals(confirmed_password)) {
-            map.put("error_message", "两次输入的密码不一致！");
-            return map;
-        }
-
-        ////将用户名中的空白字符去掉(包括空格，tab，回车)
-        //username = username.trim();
-
-        //如果username中包含空格
-        if (username.indexOf(' ') >= 0) {
-            map.put("error_message", "用户名不能包含空格！");
-            return map;
-        }
-
-        if (username.length() > 20) {
-            map.put("error_message", "用户名长度不能大于20！");
-            return map;
-        }
-
-        if (password.length() > 20) {
-            map.put("error_message", "密码长度不能大于20！");
-            return map;
-        }
-
-        if (phone.length() != 11) {
-            map.put("error_message", "手机号格式错误！");
-            return map;
-        }
-
-        //查询online_user表中"username"等于username的元组
+        
+        // 用户名重复性检验
         QueryWrapper<OnlineUser> queryWrapper1 = new QueryWrapper<>();
         queryWrapper1.eq("username", username);
-        List<OnlineUser> users = onlineUserMapper.selectList(queryWrapper1);
-        if (!users.isEmpty()) {
-            map.put("error_message", "用户名已存在！");
+        OnlineUser repeated_user = onlineUserMapper.selectOne(queryWrapper1);
+        if (repeated_user != null) {
+            map.put("message", "用户名已存在！");
             return map;
         }
-
-        //查询online_user表中"phone"等于phone的元组
+        
+        // 手机号重复性检查
         QueryWrapper<OnlineUser> queryWrapper2 = new QueryWrapper<>();
         queryWrapper2.eq("phone", phone);
-        users = onlineUserMapper.selectList(queryWrapper2);
-        if (!users.isEmpty()) {
-            map.put("error_message", "手机号已存在！");
+        repeated_user = onlineUserMapper.selectOne(queryWrapper2);
+        if (repeated_user != null) {
+            map.put("message", "手机号已存在！");
             return map;
         }
-
-        //对密码进行加密
+        
+        // 对密码进行加密
         String encodedPassword = passwordEncoder.encode(password);
-
-        //新建一个OnlineUser对象
-        OnlineUser user = new OnlineUser(username, encodedPassword, phone);
-        //在online_user表中插入新的元组
-        onlineUserMapper.insert(user);
-
-        map.put("error_message", "注册成功！");
+        
+        // 新建OnlineUser对象
+        OnlineUser new_user = new OnlineUser(username, encodedPassword, phone);
+        // 在online_user表中插入新的元组
+        onlineUserMapper.insert(new_user);
+        
+        map.put("message", "注册成功！");
         return map;
     }
-
+    
 }

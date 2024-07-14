@@ -1,5 +1,8 @@
 package com.hotelmanagementsystem.backend;
 
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.hotelmanagementsystem.backend.mapper.OnlineUserMapper;
+import com.hotelmanagementsystem.backend.pojo.OnlineUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -9,20 +12,12 @@ import java.sql.Date;
 
 @SpringBootTest
 class BackendApplicationTests {
-
+    
     @Autowired
     private PasswordEncoder passwordEncoder;
-
+    
     @Test
-    void contextLoads() {
-
-        Date A = Date.valueOf("2023-06-07");
-        Date B = Date.valueOf("2023-06-08");
-        Date C = Date.valueOf("2023-06-07");
-
-        System.out.println(B.after(A));
-        System.out.println(C.equals(A));
-
+    void test1() {
+        System.out.println(passwordEncoder.matches("psmy", "$2a$10$4Ua6sm/PKdyGd7JHcNF20.6TDSqlKi0U0k.99jXNQGyOHH5wh3JSm"));
     }
-
 }

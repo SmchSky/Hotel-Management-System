@@ -1,14 +1,19 @@
 package com.hotelmanagementsystem.backend.pojo;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
-public class Superuser extends StaffUser{
-    public Superuser(String username, String password, String number, String name, String phone, String duty) {
-        super(username, password, number, name, phone, duty);
-    }
-
-    public boolean equals(Object o) {
-        return super.equals(o);
+@EqualsAndHashCode(callSuper = true)
+public class Superuser extends User{
+    private String number;
+    private String name;
+    private String duty;
+    
+    public Superuser(String username, String password, String phone, String number, String name, String duty) {
+        super(username, password, phone);
+        this.number = number;
+        this.name = name;
+        this.duty = duty;
     }
 }

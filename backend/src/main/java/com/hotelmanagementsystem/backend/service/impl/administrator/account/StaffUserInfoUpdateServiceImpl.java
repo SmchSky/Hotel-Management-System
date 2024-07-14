@@ -2,434 +2,148 @@ package com.hotelmanagementsystem.backend.service.impl.administrator.account;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.hotelmanagementsystem.backend.mapper.*;
-import com.hotelmanagementsystem.backend.pojo.*;
 import com.hotelmanagementsystem.backend.service.inter.administrator.account.StaffUserInfoUpdateService;
 import com.hotelmanagementsystem.backend.utils.JwtUtil;
+import com.hotelmanagementsystem.backend.utils.check.info_valid_check.UserInfoValidCheck;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
 public class StaffUserInfoUpdateServiceImpl implements StaffUserInfoUpdateService {
-
+    
+    private final PasswordEncoder passwordEncoder;
+    private final FinancialStaffMapper financialStaffMapper;
+    private final FrontDeskStaffMapper frontDeskStaffMapper;
+    private final HrStaffMapper hrStaffMapper;
+    private final PurchaseStaffMapper purchaseStaffMapper;
+    private final RestaurantStaffMapper restaurantStaffMapper;
+    private final SuperuserMapper superuserMapper;
+    
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private FinancialStaffMapper financialStaffMapper;
-    @Autowired
-    private FrontDeskStaffMapper frontDeskStaffMapper;
-    @Autowired
-    private HrStaffMapper hrStaffMapper;
-    @Autowired
-    private PurchaseStaffMapper purchaseStaffMapper;
-    @Autowired
-    private RestaurantStaffMapper restaurantStaffMapper;
-    @Autowired
-    private SuperuserMapper superuserMapper;
-
+    public StaffUserInfoUpdateServiceImpl(PasswordEncoder passwordEncoder, FinancialStaffMapper financialStaffMapper, FrontDeskStaffMapper frontDeskStaffMapper, HrStaffMapper hrStaffMapper, PurchaseStaffMapper purchaseStaffMapper, RestaurantStaffMapper restaurantStaffMapper, SuperuserMapper superuserMapper) {
+        this.passwordEncoder = passwordEncoder;
+        this.financialStaffMapper = financialStaffMapper;
+        this.frontDeskStaffMapper = frontDeskStaffMapper;
+        this.hrStaffMapper = hrStaffMapper;
+        this.purchaseStaffMapper = purchaseStaffMapper;
+        this.restaurantStaffMapper = restaurantStaffMapper;
+        this.superuserMapper = superuserMapper;
+    }
+    
     @Override
     public Map<String, String> update(Map<String, String> data) {
-
-        //用于返回的map
-        Map<String, String> map = new HashMap<>();
-
-        //获取data中的信息
-        String info = data.get("info");
+        String new_info = data.get("info");
         String info_confirmed = data.get("info_confirmed");
         String duty = data.get("duty");
+        // 员工编号，可以作为员工用户表的键，而且不能被用户主动修改，故传入用来找到表中要更新的原记录
         String number = data.get("number");
         String type = data.get("type");
-
-        //进行username合法性检验
-        if ("username".equals(type)) {
-            if (info.length() == 0) {
-                map.put("error_message", "用户名不能为空！");
-                return map;
+        
+        // 合法性检验的结果消息
+        String message = null;
+        // 合法性检验
+        switch (type) {
+            case "username" ->
+                    message = UserInfoValidCheck.checkStaffUserInfoValid(new_info, null, null, null, null, null);
+            case "password" ->
+                    message = UserInfoValidCheck.checkStaffUserInfoValid(null, new_info, info_confirmed, null, null, null);
+            case "phone" ->
+                    message = UserInfoValidCheck.checkStaffUserInfoValid(null, null, null, new_info, null, null);
+            case "name" ->
+                    message = UserInfoValidCheck.checkStaffUserInfoValid(null, null, null, null, new_info, null);
+        }
+        // 信息不合法
+        if (message != null && !message.equals("success")) {
+            Map<String, String> map = new HashMap<>();
+            map.put("message", message);
+            return map;
+        }
+        // 根据职务类型，更新员工信息
+        switch (duty) {
+            case "财务管理员" -> {
+                return updateStaffInfo(financialStaffMapper, type, new_info, number, "财务管理员");
             }
-            if (info.indexOf(' ') >= 0) {
-                map.put("error_message", "用户名不能包含空格！");
-                return map;
+            case "酒店前台工作人员" -> {
+                return updateStaffInfo(frontDeskStaffMapper, type, new_info, number, "酒店前台工作人员");
             }
-            if (info.length() > 20) {
-                map.put("error_message", "用户名长度不能大于20！");
-                return map;
+            case "人事管理员" -> {
+                return updateStaffInfo(hrStaffMapper, type, new_info, number, "人事管理员");
+            }
+            case "采购人员" -> {
+                return updateStaffInfo(purchaseStaffMapper, type, new_info, number, "采购人员");
+            }
+            case "餐厅前台工作人员" -> {
+                return updateStaffInfo(restaurantStaffMapper, type, new_info, number, "餐厅前台工作人员");
+            }
+            case "超级用户" -> {
+                return updateStaffInfo(superuserMapper, type, new_info, number, "超级用户");
+            }
+            default -> {
+                return new HashMap<>() {{
+                    put("message", "职务类型错误！");
+                }};
             }
         }
-
-        //进行password合法性检验
-        if ("password".equals(type)) {
-            if (info.length() == 0) {
-                map.put("error_message", "密码不能为空！");
-                return map;
-            }
-            if (info.length() > 20) {
-                map.put("error_message", "密码长度不能大于20！");
-                return map;
-            }
-            if (info_confirmed.length() == 0) {
-                map.put("error_message", "确认密码不能为空！");
-                return map;
-            }
-
-            if (!info.equals(info_confirmed)) {
-                map.put("error_message", "两次输入的密码不一致！");
-                return map;
-            }
-        }
-
-        //进行name合法性检验
-        if ("name".equals(type)) {
-            if (info.length() == 0) {
-                map.put("error_message", "员工姓名不能为空！");
-                return map;
-            }
-            if (info.length() > 20) {
-                map.put("error_message", "员工姓名长度不能大于20！");
-                return map;
-            }
-        }
-
-        //进行phone合法性检验
-        if ("phone".equals(type)) {
-            if (info.length() != 11) {
-                map.put("error_message", "手机号格式错误！");
-                return map;
-            }
-        }
-
-        //根据duty的情况在不同表中进行查找是否重复以及更新
-        //酒店前台工作人员
-        if ("酒店前台工作人员".equals(duty)) {
-            if ("username".equals(type)) {
-                //根据username在表中进行重复性检验
-                QueryWrapper<FrontDeskStaff> queryWrapper1 = new QueryWrapper<>();
-                queryWrapper1.eq("username", info);
-                List<FrontDeskStaff> list = frontDeskStaffMapper.selectList(queryWrapper1);
-                if (list.isEmpty()) {
-                    //没有重复
-                    //在表中找到要更改的元组并更改
-                    UpdateWrapper<FrontDeskStaff> updateWrapper = new UpdateWrapper<>();
-                    updateWrapper.eq("number", number).set("username", info);
-                    frontDeskStaffMapper.update(null, updateWrapper);
-                    //利用username和duty生成新的token并返回（好！）
-                    String jwt = JwtUtil.createJWT(info, duty);
-                    //返回map
-                    map.put("error_message", "success");
-                    map.put("token", jwt);
-                    return map;
-                } else {
-                    //有重复
-                    map.put("error_message", "用户名已存在！");
+    }
+    
+    private <T> Map<String, String> updateStaffInfo(BaseMapper<T> mapper, String type, String newInfo, String number, String duty) {
+        Map<String, String> map = new HashMap<>();
+        switch (type) {
+            case "username" -> {
+                // 重复性检验
+                QueryWrapper<T> queryWrapper = new QueryWrapper<>();
+                queryWrapper.eq("username", newInfo);
+                T repeatedUser = mapper.selectOne(queryWrapper);
+                if (repeatedUser != null) {
+                    map.put("message", "用户名已存在！");
                     return map;
                 }
+                // 执行更新操作
+                UpdateWrapper<T> updateWrapper = new UpdateWrapper<>();
+                updateWrapper.eq("number", number).set("username", newInfo);
+                mapper.update(null, updateWrapper);
+                // 生成新的token
+                String token = JwtUtil.createJwtTokenForStaffUser(newInfo, duty);
+                map.put("message", "success");
+                map.put("token", token);
             }
-            if ("password".equals(type)) {
-                //在表中找到要更改的元组并更改
-                UpdateWrapper<FrontDeskStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("password", passwordEncoder.encode(info));
-                frontDeskStaffMapper.update(null, updateWrapper);
-                //更新信息成功
-                map.put("error_message", "success");
-                return map;
+            case "password" -> {
+                // 执行更新
+                UpdateWrapper<T> updateWrapper = new UpdateWrapper<>();
+                updateWrapper.eq("number", number).set("password", passwordEncoder.encode(newInfo));
+                mapper.update(null, updateWrapper);
+                map.put("message", "success");
             }
-            if ("name".equals(type)) {
-                //在表中找到要更改的元组并更改
-                UpdateWrapper<FrontDeskStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("name", info);
-                frontDeskStaffMapper.update(null, updateWrapper);
-                //更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("phone".equals(type)) {
-                //在表中找到要更改的元组并更改
-                UpdateWrapper<FrontDeskStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("phone", info);
-                frontDeskStaffMapper.update(null, updateWrapper);
-                //更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-        }
-
-        //餐厅前台工作人员
-        if ("餐厅前台工作人员".equals(duty)) {
-            if ("username".equals(type)) {
-                //根据username在表中进行重复性检验
-                QueryWrapper<RestaurantStaff> queryWrapper1 = new QueryWrapper<>();
-                queryWrapper1.eq("username", info);
-                List<RestaurantStaff> list = restaurantStaffMapper.selectList(queryWrapper1);
-                if (list.isEmpty()) {
-                    //没有重复
-                    //在表中找到要更改的元组并更改
-                    UpdateWrapper<RestaurantStaff> updateWrapper = new UpdateWrapper<>();
-                    updateWrapper.eq("number", number).set("username", info);
-                    restaurantStaffMapper.update(null, updateWrapper);
-                    //利用username和duty生成新的token并返回（好！）
-                    String jwt = JwtUtil.createJWT(info, duty);
-                    //返回map
-                    map.put("error_message", "success");
-                    map.put("token", jwt);
-                    return map;
-                } else {
-                    //有重复
-                    map.put("error_message", "用户名已存在！");
+            case "phone" -> {
+                // 重复性检验
+                QueryWrapper<T> queryWrapper = new QueryWrapper<>();
+                queryWrapper.eq("phone", newInfo);
+                T repeatedUser = mapper.selectOne(queryWrapper);
+                if (repeatedUser != null) {
+                    map.put("message", "手机号已存在！");
                     return map;
                 }
+                // 执行更新操作
+                UpdateWrapper<T> updateWrapper = new UpdateWrapper<>();
+                updateWrapper.eq("number", number).set("phone", newInfo);
+                mapper.update(null, updateWrapper);
+                map.put("message", "success");
             }
-            if ("password".equals(type)) {
-                //在表中找到要更改的元组并更改
-                UpdateWrapper<RestaurantStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("password", passwordEncoder.encode(info));
-                restaurantStaffMapper.update(null, updateWrapper);
-                //更新信息成功
-                map.put("error_message", "success");
-                return map;
+            case "name" -> {
+                // 执行更新
+                UpdateWrapper<T> updateWrapper = new UpdateWrapper<>();
+                updateWrapper.eq("number", number).set("name", newInfo);
+                mapper.update(null, updateWrapper);
+                map.put("message", "success");
             }
-            if ("name".equals(type)) {
-                //在表中找到要更改的元组并更改
-                UpdateWrapper<RestaurantStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("name", info);
-                restaurantStaffMapper.update(null, updateWrapper);
-                //更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("phone".equals(type)) {
-                //在表中找到要更改的元组并更改
-                UpdateWrapper<RestaurantStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("phone", info);
-                restaurantStaffMapper.update(null, updateWrapper);
-                //更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
+            default -> map.put("message", "更新的信息类型错误！");
         }
-
-        //人事管理员
-        if ("人事管理员".equals(duty)) {
-            if ("username".equals(type)) {
-                // 根据username在表中进行重复性检验
-                QueryWrapper<HrStaff> queryWrapper1 = new QueryWrapper<>();
-                queryWrapper1.eq("username", info);
-                List<HrStaff> list = hrStaffMapper.selectList(queryWrapper1);
-                if (list.isEmpty()) {
-                    // 没有重复
-                    // 在表中找到要更改的元组并更改
-                    UpdateWrapper<HrStaff> updateWrapper = new UpdateWrapper<>();
-                    updateWrapper.eq("number", number).set("username", info);
-                    hrStaffMapper.update(null, updateWrapper);
-                    // 利用username和duty生成新的token并返回
-                    String jwt = JwtUtil.createJWT(info, duty);
-                    // 返回map
-                    map.put("error_message", "success");
-                    map.put("token", jwt);
-                    return map;
-                } else {
-                    // 有重复
-                    map.put("error_message", "用户名已存在！");
-                    return map;
-                }
-            }
-            if ("password".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<HrStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("password", passwordEncoder.encode(info));
-                hrStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("name".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<HrStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("name", info);
-                hrStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("phone".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<HrStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("phone", info);
-                hrStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-        }
-
-        //财务管理员
-        if ("财务管理员".equals(duty)) {
-            if ("username".equals(type)) {
-                // 根据username在表中进行重复性检验
-                QueryWrapper<FinancialStaff> queryWrapper1 = new QueryWrapper<>();
-                queryWrapper1.eq("username", info);
-                List<FinancialStaff> list = financialStaffMapper.selectList(queryWrapper1);
-                if (list.isEmpty()) {
-                    // 没有重复
-                    // 在表中找到要更改的元组并更改
-                    UpdateWrapper<FinancialStaff> updateWrapper = new UpdateWrapper<>();
-                    updateWrapper.eq("number", number).set("username", info);
-                    financialStaffMapper.update(null, updateWrapper);
-                    // 利用username和duty生成新的token并返回
-                    String jwt = JwtUtil.createJWT(info, duty);
-                    // 返回map
-                    map.put("error_message", "success");
-                    map.put("token", jwt);
-                    return map;
-                } else {
-                    // 有重复
-                    map.put("error_message", "用户名已存在！");
-                    return map;
-                }
-            }
-            if ("password".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<FinancialStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("password", passwordEncoder.encode(info));
-                financialStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("name".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<FinancialStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("name", info);
-                financialStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("phone".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<FinancialStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("phone", info);
-                financialStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-        }
-
-        //采购人员
-        if ("采购人员".equals(duty)) {
-            if ("username".equals(type)) {
-                // 根据username在表中进行重复性检验
-                QueryWrapper<PurchaseStaff> queryWrapper1 = new QueryWrapper<>();
-                queryWrapper1.eq("username", info);
-                List<PurchaseStaff> list = purchaseStaffMapper.selectList(queryWrapper1);
-                if (list.isEmpty()) {
-                    // 没有重复
-                    // 在表中找到要更改的元组并更改
-                    UpdateWrapper<PurchaseStaff> updateWrapper = new UpdateWrapper<>();
-                    updateWrapper.eq("number", number).set("username", info);
-                    purchaseStaffMapper.update(null, updateWrapper);
-                    // 利用username和duty生成新的token并返回（好！）
-                    String jwt = JwtUtil.createJWT(info, duty);
-                    // 返回map
-                    map.put("error_message", "success");
-                    map.put("token", jwt);
-                    return map;
-                } else {
-                    // 有重复
-                    map.put("error_message", "用户名已存在！");
-                    return map;
-                }
-            }
-            if ("password".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<PurchaseStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("password", passwordEncoder.encode(info));
-                purchaseStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("name".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<PurchaseStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("name", info);
-                purchaseStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("phone".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<PurchaseStaff> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("phone", info);
-                purchaseStaffMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-        }
-
-        //超级用户
-        if ("超级用户".equals(duty)) {
-            if ("username".equals(type)) {
-                // 根据username在表中进行重复性检验
-                QueryWrapper<Superuser> queryWrapper1 = new QueryWrapper<>();
-                queryWrapper1.eq("username", info);
-                List<Superuser> list = superuserMapper.selectList(queryWrapper1);
-                if (list.isEmpty()) {
-                    // 没有重复
-                    // 在表中找到要更改的元组并更改
-                    UpdateWrapper<Superuser> updateWrapper = new UpdateWrapper<>();
-                    updateWrapper.eq("number", number).set("username", info);
-                    superuserMapper.update(null, updateWrapper);
-                    // 利用username和duty生成新的token并返回（好！）
-                    String jwt = JwtUtil.createJWT(info, duty);
-                    // 返回map
-                    map.put("error_message", "success");
-                    map.put("token", jwt);
-                    return map;
-                } else {
-                    // 有重复
-                    map.put("error_message", "用户名已存在！");
-                    return map;
-                }
-            }
-            if ("password".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<Superuser> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("password", passwordEncoder.encode(info));
-                superuserMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("name".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<Superuser> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("name", info);
-                superuserMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-            if ("phone".equals(type)) {
-                // 在表中找到要更改的元组并更改
-                UpdateWrapper<Superuser> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("number", number).set("phone", info);
-                superuserMapper.update(null, updateWrapper);
-                // 更新信息成功
-                map.put("error_message", "success");
-                return map;
-            }
-        }
-
-        //更新的信息类型错误
-        map.put("error_message", "更新的信息类型错误！");
         return map;
     }
 }

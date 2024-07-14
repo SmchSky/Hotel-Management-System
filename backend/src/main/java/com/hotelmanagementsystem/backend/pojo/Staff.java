@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.sql.Date;
+import java.time.LocalDate;
 
 @Data
 @AllArgsConstructor
@@ -17,9 +17,9 @@ public class Staff {
     private String sex;
     private String nation;
     private String id;
-    private Date birthdate;
+    private LocalDate birthdate;
     private String nativePlace;
-    private Date entryDate;
+    private LocalDate entryDate;
     private String education;
     private String phone;
     private String duty;

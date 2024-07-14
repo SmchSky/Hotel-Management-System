@@ -12,21 +12,22 @@ import java.util.Map;
 
 @Service
 public class CancelReservationServiceImpl implements CancelReservationService {
+    
+    private final ReservationRecordMapper reservationRecordMapper;
+    
     @Autowired
-    private ReservationRecordMapper reservationRecordMapper;
+    public CancelReservationServiceImpl(ReservationRecordMapper reservationRecordMapper) {
+        this.reservationRecordMapper = reservationRecordMapper;
+    }
 
     @Override
     public Map<String, String> cancel(Map<String, String> data) {
-        //返回的map
         Map<String, String> map = new HashMap<>();
-        //取出信息
         String number = data.get("number");
-        //查询并更新预约记录的状态为“已取消”
         UpdateWrapper<ReservationRecord> updateWrapper = new UpdateWrapper<>();
         updateWrapper.eq("number", number).set("status", "已取消");
         reservationRecordMapper.update(null, updateWrapper);
-        //返回map
-        map.put("error_message", "success");
+        map.put("message", "success");
         return map;
     }
 }

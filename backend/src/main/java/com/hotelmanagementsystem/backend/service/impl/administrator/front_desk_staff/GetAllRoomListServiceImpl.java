@@ -7,20 +7,21 @@ import com.hotelmanagementsystem.backend.service.inter.administrator.front_desk_
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class GetAllRoomListServiceImpl implements GetAllRoomListService {
     
+    private final RoomMapper roomMapper;
+    
     @Autowired
-    private RoomMapper roomMapper;
+    public GetAllRoomListServiceImpl(RoomMapper roomMapper) {
+        this.roomMapper = roomMapper;
+    }
     
     @Override
     public List<Room> getRoomList() {
-        // 定义查询器
         QueryWrapper<Room> queryWrapper = new QueryWrapper<>();
-        // 返回结果
-        return new ArrayList<>(roomMapper.selectList(queryWrapper));
+        return roomMapper.selectList(queryWrapper);
     }
 }

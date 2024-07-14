@@ -16,7 +16,6 @@ export default {
         updateUser (state, user) {
             state.username = user.username;
             state.phone = user.phone;
-            state.is_login = user.is_login;
         },
         updateToken (state, token) {
             state.token = token;
@@ -35,78 +34,76 @@ export default {
         },
     },
     actions: {
-        //若要调用actions里的函数，用store.dispatch()
-        //完成异步操作（需要与云端交互）
+        // 若要调用actions里的函数，用store.dispatch()方法，完成的是异步操作
         login (context, data) {
             $.ajax({
-                url: 'http://localhost:3000/online_user/account/login/',
+                url: 'http://localhost:3000/hotel/online_user/login/',
                 type: 'post',  //向服务器提交数据
                 data: {
                     username: data.username,
                     password: data.password,
                 },
                 success (resp) {
-                    if (resp.error_message === "success") {
-                        //将token存入本地存储
-                        localStorage.setItem("jwt_token", resp.token);
-                        //调用mutations中的函数
+                    if (resp.message === "success") {
+                        // 将token存入本地存储
+                        localStorage.setItem("jwt", resp.token);
+                        // 保存token以及登录状态到应用程序上下文中
                         context.commit("updateToken", resp.token);
-                        //回调函数
+                        context.commit("updateIsLogin", true);
+                        // 认证成功的回调函数
                         data.success();
                     } else {
-                        //回调函数
+                        // 认证失败的回调函数
                         data.error();
                     }
-                },
-                error () {
-                    //回调函数
-                    data.error();
                 }
             });
         },
-
         getInfo (context, data) {
             $.ajax({
-                url: 'http://localhost:3000/online_user/account/info/',
-                type: 'get',  //向服务器提交数据
+                url: 'http://localhost:3000/hotel/online_user/info/',
+                type: 'get',
                 headers: {
                     Authorization: 'Bearer ' + localStorage.getItem("jwt_token"),
                 },
                 success (resp) {
-                    if (resp.error_message === "success") {
-                        //调用mutations中的函数
+                    if (resp.message === "success") {
                         context.commit("updateUser", {
-                            //...resp,  //将resp解构出来
                             username: resp.username,
                             phone: resp.phone,
-                            is_login: true,
                         });
-                        //将用户信息存入本地
+                        // 将用户信息存入本地
                         localStorage.setItem("onlineuser_username", resp.username);
                         localStorage.setItem("onlineuser_phone", resp.phone);
-                        //回调函数
                         data.success();
-                    } else {
-                        data.error();
                     }
                 },
-                error () {
-                    data.error();
+                error (xhr) {
+                    // 处理401错误响应
+                    if (xhr.status === 401) {
+                        let message;
+                        try {
+                            // 尝试解析响应体中的message字段（该字段在后端的jwt过滤器中设置）
+                            const responseJson = JSON.parse(xhr.responseText);
+                            message = responseJson.message;
+                            alert('Unauthorized access, please log in again! Error message:' + message);
+                        } catch (e) {
+                            // 如果解析失败，使用默认消息
+                            alert('Unauthorized access, please log in again!');
+                        }
+                    } else {
+                        // 处理其他错误
+                        alert('An unknown error occurred: ' + xhr.status);
+                    }
                 }
             });
         },
-
         logout (context) {
-            //将token从本地存储删除
-            localStorage.removeItem("jwt_token");
+            localStorage.removeItem("jwt");
             localStorage.removeItem("onlineuser_username");
             localStorage.removeItem("onlineuser_phone");
-
-            //调用mutations中的函数
             context.commit("logout");
         }
-
-
     },
     modules: {
     }

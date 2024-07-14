@@ -7,14 +7,21 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/hotel")
 public class StaffUserLoginController {
+    
+    private final StaffUserLoginService loginService;
+    
     @Autowired
-    private StaffUserLoginService loginService;
-
-    @PostMapping("/staff_user/account/login/")
-    public Map<String, String> getToken(@RequestParam Map<String, String> data) {
+    public StaffUserLoginController(StaffUserLoginService loginService) {
+        this.loginService = loginService;
+    }
+    
+    @PostMapping("/staff_user/login")
+    public Map<String, String> login(@RequestParam Map<String, String> data) {
         String username = data.get("username");
         String password = data.get("password");
-        return loginService.getToken(username, password);
+        String duty = data.get("duty");
+        return loginService.login(username, password, duty);
     }
 }
